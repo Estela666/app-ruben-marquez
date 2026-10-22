@@ -42,6 +42,13 @@ const INITIAL_SESSIONS = [
   { id: 's3', clientId: '3', clientName: 'David Gómez', trainer: 'Facundo', date: new Date().toISOString().split('T')[0], time: '17:00' },
 ];
 
+const MONTH_NAMES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+];
+
+const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
 export default function App() {
   const [clients, setClients] = useState(() => {
     const saved = localStorage.getItem('rma_clients');
@@ -62,7 +69,6 @@ export default function App() {
     return localStorage.getItem('rma_admin_pw') || '1234';
   });
 
-  // UI State
   const [activeTab, setActiveTab] = useState('calendar'); // 'calendar', 'clients_admin', 'athlete_view', 'settings'
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
@@ -99,8 +105,13 @@ export default function App() {
     }
   }, [clients, selectedAthleteId]);
 
-  // Date selection
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
 
   // Session Modal State
   const [showSessionModal, setShowSessionModal] = useState(false);
@@ -222,6 +233,75 @@ export default function App() {
     const hour = i + 7;
     return `${hour < 10 ? '0' : ''}${hour}:00`;
   });
+
+  const handlePrevMonth = () => {
+    setCurrentCalendarDate(prev => {
+      if (prev.month === 0) {
+        return { year: prev.year - 1, month: 11 };
+      }
+      return { ...prev, month: prev.month - 1 };
+    });
+  };
+
+  const handleNextMonth = () => {
+    setCurrentCalendarDate(prev => {
+      if (prev.month === 11) {
+        return { year: prev.year + 1, month: 0 };
+      }
+      return { ...prev, month: prev.month + 1 };
+    });
+  };
+
+  const handleTodayCalendar = () => {
+    const now = new Date();
+    setCurrentCalendarDate({ year: now.getFullYear(), month: now.getMonth() });
+    setSelectedDate(now.toISOString().split('T')[0]);
+  };
+
+  // Generate days array for current month grid
+  const getDaysInMonthGrid = () => {
+    const { year, month } = currentCalendarDate;
+    const firstDayIndex = new Date(year, month, 1).getDay(); // 0 is Sunday
+    // Adjust to European Monday-first format (Monday: 0, Sunday: 6)
+    const adjustedFirstDay = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+    const totalDays = new Date(year, month + 1, 0).getDate();
+
+    const days = [];
+    
+    // Padding from previous month
+    const prevMonthDays = new Date(year, month, 0).getDate();
+    for (let i = adjustedFirstDay - 1; i >= 0; i--) {
+      days.push({
+        dayNumber: prevMonthDays - i,
+        isCurrentMonth: false,
+        dateStr: null
+      });
+    }
+
+    // Days in current month
+    for (let d = 1; d <= totalDays; d++) {
+      const monthFormatted = (month + 1).toString().padStart(2, '0');
+      const dayFormatted = d.toString().padStart(2, '0');
+      const dateStr = `${year}-${monthFormatted}-${dayFormatted}`;
+      days.push({
+        dayNumber: d,
+        isCurrentMonth: true,
+        dateStr: dateStr
+      });
+    }
+
+    // Padding for next month to complete grid
+    const remainingSlots = 42 - days.length; // 6 rows of 7
+    for (let i = 1; i <= (remainingSlots < 7 ? remainingSlots : remainingSlots % 7); i++) {
+      days.push({
+        dayNumber: i,
+        isCurrentMonth: false,
+        dateStr: null
+      });
+    }
+
+    return days;
+  };
 
   const handleOpenAddSession = (time) => {
     if (clients.length === 0) {
@@ -452,6 +532,7 @@ export default function App() {
       )}
 
       {/* HEADER */}
+      {}
       <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center space-x-3">
@@ -536,34 +617,172 @@ export default function App() {
       {/* MAIN CONTAINER */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-        {/* TAB 1: AGENDA CALENDARIO POR HORAS */}
+        {/* TAB 1: AGENDA CON CALENDARIO MES/AÑO COMPLETO */}
+        {}
         {activeTab === 'calendar' && (
           <div className="space-y-6">
             
-            {/* Date Picker Header */}
+            {/* Full Calendar Control Section */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 shadow-2xl space-y-4">
+              
+              {/* Header: Month and Year selector + navigation */}
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pb-3 border-b border-slate-800">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
+                    <CalendarIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-white capitalize">
+                      {MONTH_NAMES[currentCalendarDate.month]} {currentCalendarDate.year}
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      Haz clic en cualquier día para agendar y ver reservas
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePrevMonth}
+                    className="p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl border border-slate-700 transition-colors"
+                    title="Mes Anterior"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+
+                  {/* Dropdowns for Month and Year quick jump */}
+                  <select
+                    value={currentCalendarDate.month}
+                    onChange={(e) => setCurrentCalendarDate({ ...currentCalendarDate, month: Number(e.target.value) })}
+                    className="bg-slate-950 border border-slate-700 text-amber-400 font-bold px-3 py-1.5 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  >
+                    {MONTH_NAMES.map((name, idx) => (
+                      <option key={idx} value={idx}>{name}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={currentCalendarDate.year}
+                    onChange={(e) => setCurrentCalendarDate({ ...currentCalendarDate, year: Number(e.target.value) })}
+                    className="bg-slate-950 border border-slate-700 text-amber-400 font-bold px-3 py-1.5 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  >
+                    {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={handleNextMonth}
+                    className="p-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl border border-slate-700 transition-colors"
+                    title="Mes Siguiente"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    onClick={handleTodayCalendar}
+                    className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold px-3.5 py-1.5 rounded-xl text-xs transition-colors ml-1 shadow-md"
+                  >
+                    Hoy
+                  </button>
+                </div>
+              </div>
+
+              {/* Month Grid */}
+              <div>
+                {/* Weekday labels */}
+                <div className="grid grid-cols-7 text-center font-bold text-xs text-slate-400 pb-2 border-b border-slate-800/60">
+                  {WEEKDAYS.map((wd, i) => (
+                    <div key={i} className="py-1">{wd}</div>
+                  ))}
+                </div>
+
+                {/* Days Grid */}
+                <div className="grid grid-cols-7 gap-1 pt-2">
+                  {getDaysInMonthGrid().map((item, idx) => {
+                    if (!item.isCurrentMonth) {
+                      return (
+                        <div key={idx} className="h-14 sm:h-16 p-1 bg-slate-950/20 rounded-xl opacity-30 text-xs text-slate-600 border border-transparent">
+                          <span>{item.dayNumber}</span>
+                        </div>
+                      );
+                    }
+
+                    const isSelected = item.dateStr === selectedDate;
+                    const isToday = item.dateStr === todayStr;
+                    const daySessionsCount = sessions.filter(s => s.date === item.dateStr).length;
+
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedDate(item.dateStr)}
+                        className={`h-14 sm:h-16 p-1.5 rounded-2xl border text-left transition-all flex flex-col justify-between relative group ${
+                          isSelected
+                            ? 'bg-amber-500/20 border-amber-500 text-white shadow-lg ring-1 ring-amber-500'
+                            : isToday
+                            ? 'bg-slate-800 border-amber-500/50 text-amber-300'
+                            : 'bg-slate-950/80 border-slate-800/80 hover:border-slate-700 hover:bg-slate-800/40 text-slate-300'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center w-full">
+                          <span className={`text-xs font-bold rounded-lg px-1.5 py-0.5 ${
+                            isSelected ? 'bg-amber-500 text-slate-950' : isToday ? 'bg-amber-500/20 text-amber-400' : 'text-slate-300'
+                          }`}>
+                            {item.dayNumber}
+                          </span>
+
+                          {daySessionsCount > 0 && (
+                            <span className="text-[10px] font-mono font-bold bg-amber-500 text-slate-950 px-1.5 py-0.2 rounded-full">
+                              {daySessionsCount}
+                            </span>
+                          )}
+                        </div>
+
+                        {daySessionsCount > 0 && (
+                          <div className="w-full flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                            <span className="text-[10px] text-amber-300 truncate font-medium">
+                              {daySessionsCount} {daySessionsCount === 1 ? 'cita' : 'citas'}
+                            </span>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Selected Date Header Display */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
               <div className="flex items-center gap-3">
-                <CalendarIcon className="w-5 h-5 text-amber-400" />
-                <span className="font-bold text-white text-base">Selecciona Día de Entrenamiento:</span>
+                <Clock className="w-5 h-5 text-amber-400" />
+                <div>
+                  <span className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Entrenamientos para el día:</span>
+                  <h3 className="text-lg font-black text-white">
+                    {new Date(selectedDate + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  </h3>
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
                 <input
                   type="date"
                   value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-slate-950 border border-slate-700 text-amber-400 font-bold px-4 py-2 rounded-xl text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  onChange={(e) => {
+                    setSelectedDate(e.target.value);
+                    if (e.target.value) {
+                      const d = new Date(e.target.value + 'T00:00:00');
+                      setCurrentCalendarDate({ year: d.getFullYear(), month: d.getMonth() });
+                    }
+                  }}
+                  className="bg-slate-950 border border-slate-700 text-amber-400 font-bold px-4 py-2 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
                 />
-                <button
-                  onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
-                  className="bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 font-semibold px-3 py-2 rounded-xl border border-slate-700 transition-colors"
-                >
-                  Hoy
-                </button>
               </div>
             </div>
 
-            {/* Schedule Slots */}
+            {/* Hourly Schedule Slots Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {HOURS.map(hour => {
                 const hourSessions = sessions.filter(s => s.date === selectedDate && s.time === hour);
@@ -634,6 +853,7 @@ export default function App() {
         )}
 
         {/* TAB 2: VISTA DEL DEPORTISTA */}
+        {}
         {activeTab === 'athlete_view' && (
           <div className="max-w-3xl mx-auto space-y-6">
             
@@ -740,6 +960,7 @@ export default function App() {
         )}
 
         {/* TAB 3: GESTIÓN Y CONTROL DE PAGOS (ADMIN) */}
+        {}
         {activeTab === 'clients_admin' && isAdminLoggedIn && (
           <div className="space-y-6">
             
@@ -893,6 +1114,7 @@ export default function App() {
         )}
 
         {/* TAB 4: AJUSTES & CAMBIO DE CONTRASEÑA */}
+        {}
         {activeTab === 'settings' && isAdminLoggedIn && (
           <div className="max-w-3xl mx-auto space-y-6">
             
@@ -997,9 +1219,10 @@ export default function App() {
 
       </main>
 
+      {/* MODALS SECTION */}
       {}
 
-      {/* CUSTOM CONFIRMATION MODAL (Replaces window.confirm) */}
+      {/* CUSTOM CONFIRMATION MODAL */}
       {confirmModal.isOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
@@ -1109,7 +1332,7 @@ export default function App() {
                 <select
                   value={sessionForm.clientId}
                   onChange={(e) => setSessionForm({ ...sessionForm, clientId: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
                 >
                   {clients.map(c => (
                     <option key={c.id} value={c.id}>
@@ -1124,7 +1347,7 @@ export default function App() {
                 <select
                   value={sessionForm.trainer}
                   onChange={(e) => setSessionForm({ ...sessionForm, trainer: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-amber-500 focus:outline-none text-sm"
                 >
                   {trainers.map(t => (
                     <option key={t} value={t}>{t}</option>
